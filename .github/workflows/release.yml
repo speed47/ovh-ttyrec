@@ -91,7 +91,7 @@ jobs:
         version=$(echo "$debname" | cut -d_ -f2)
         mkdir ovh-ttyrec-$version
         install ttyrec ttyplay ttytime ovh-ttyrec-$version
-        cp ttyrec.1 ttyplay.1 ttytime.1 ovh-ttyrec-$version
+        cp -va docs ovh-ttyrec-$version
         tar cvzf ovh-ttyrec-$version.tar.gz ovh-ttyrec-$version
         echo "Static tar.gz archive name is $debname"
         echo "::set-output name=static_package::ovh-ttyrec-$version.tar.gz"
