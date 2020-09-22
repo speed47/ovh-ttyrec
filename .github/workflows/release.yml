@@ -72,6 +72,7 @@ jobs:
         dpkg -L ovh-ttyrec
 
     - name: build fully static version
+      run: |
         make clean && STATIC=1 ./configure && make -j$(nproc) && ./ttyrec -V
         ./ttyrec -V | grep -qF 'zstd[static]'
         if ldd ttyrec; then
