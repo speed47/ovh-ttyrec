@@ -85,7 +85,7 @@ jobs:
         upload_url=$(jq -r '.release.upload_url' < $GITHUB_EVENT_PATH)
         echo "Upload URL is $upload_url"
         echo "::set-output name=upload_url::$upload_url"
-        debname=$(ls ./ovh-ttyrec_*.deb)
+        debname=$(ls ../ovh-ttyrec_*.deb)
         echo "Debian package name is $debname"
         echo "::set-output name=debian_package::$debname"
         version=$(echo "$debname" | cut -d_ -f2)
