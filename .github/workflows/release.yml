@@ -35,7 +35,7 @@ jobs:
         tempfolder=$(mktemp -d)
         cd $tempfolder
         mkdir ovh-ttyrec
-        rsync -va $curdir/ ovh-ttyrec/
+        rsync -va --exclude=.git $curdir/ ovh-ttyrec/
         zip -9r ~/ovh-ttyrec.zip ovh-ttyrec
 
     - name: check style
