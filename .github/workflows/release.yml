@@ -95,7 +95,7 @@ jobs:
     - name: build rpm package
       run: |
         mkdir -p ~/rpmbuild/SOURCES
-        mv ~/ovh-ttyrec.zip ~/rpmbuild/SOURCES
+        mv ~/ovh-ttyrec.zip ~/rpmbuild/SOURCES/master.zip
         rpmbuild -bb ovh-ttyrec.spec
 
     - name: get release vars
