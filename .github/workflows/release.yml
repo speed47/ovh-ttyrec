@@ -21,7 +21,7 @@ jobs:
           head -n1 debian/changelog
           exit 1
         fi
-        if ! grep -F "ovh-ttyrec ($VERSION) master" ovh-ttyrec.spec; then
+        if ! grep -F "  $VERSION" ovh-ttyrec.spec; then
           echo "inconsistency between version ($VERSION) and rpm changelog:"
           exit 1
         fi
