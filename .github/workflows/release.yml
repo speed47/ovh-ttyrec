@@ -94,7 +94,7 @@ jobs:
 
     - name: build rpm package
       run: |
-        test -d ~/rpmbuild/SOURCES && mkdir -p ~/rpmbuild/SOURCES
+        mkdir -p ~/rpmbuild/SOURCES
         mv ~/ovh-ttyrec.zip ~/rpmbuild/SOURCES
         rpmbuild -bb ovh-ttyrec.spec
 
