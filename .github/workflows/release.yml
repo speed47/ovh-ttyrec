@@ -27,7 +27,10 @@ jobs:
         fi
 
     - name: install prerequisites
-      run: sudo apt-get update && sudo apt-get install -y uncrustify make git debhelper tar gzip jq unzip rpm
+      run: sudo apt-get update && sudo apt-get install -y uncrustify make git debhelper tar gzip jq zip unzip rpm rsync
+
+    - name: create source zip file for rpm build
+      run: mkdir ../ovh-ttyrec && rsync -va . ../ovh-ttyrec/ && cd .. && zip -9r ovh-ttyrec.zip ovh-ttyrec
 
     - name: check style
       run: |
@@ -86,6 +89,7 @@ jobs:
     - name: build rpm package
       run: |
         test -d ~/rpmbuild/SOURCES && mkdir -p ~/rpmbuild/SOURCES
+        mv ../ovh-ttyrec.zip ~/rpmbuild/SOURCES
         rpmbuild -bb ovh-ttyrec.spec
 
     - name: get release vars
