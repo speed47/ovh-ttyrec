@@ -96,6 +96,7 @@ jobs:
       run: |
         mkdir -p ~/rpmbuild/SOURCES
         mv ~/ovh-ttyrec.zip ~/rpmbuild/SOURCES/master.zip
+        unzip -l ~/rpmbuild/SOURCES/master.zip
         rpmbuild -bb ovh-ttyrec.spec
 
     - name: get release vars
@@ -151,6 +152,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.getvars.outputs.upload_url }}
-        asset_path: ./${{ steps.getvars.outputs.static_package }}
+        asset_path: ${{ steps.getvars.outputs.static_package }}
         asset_name: ${{ steps.getvars.outputs.static_package }}
         asset_content_type: application/gzip
