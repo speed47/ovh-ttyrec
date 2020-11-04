@@ -35,7 +35,7 @@ jobs:
         tempfolder=$(mktemp -d)
         cd $tempfolder
         mkdir ovh-ttyrec
-        rsync -va $curdir/ ovh-ttyrec/
+        rsync -va --exclude=.git $curdir/ ovh-ttyrec/
         zip -9r ~/ovh-ttyrec.zip ovh-ttyrec
 
     - name: check style
@@ -105,23 +105,24 @@ jobs:
         upload_url=$(jq -r '.release.upload_url' < $GITHUB_EVENT_PATH)
         echo "Upload URL is $upload_url"
         echo "::set-output name=upload_url::$upload_url"
-        rpmpath=$(find ~/rpmbuild/RPMS -type f -name "*.rpm")
+        rpmpath=$(readlink -f $(find ~/rpmbuild/RPMS -type f -name "*.rpm"))
         rpmname=$(basename "$rpmpath")
         echo "RPM package name is $rpmname ($rpmpath)"
         echo "::set-output name=rpmname::$rpmname"
         echo "::set-output name=rpmpath::$rpmpath"
-        debpath=$(find .. -mindepth 1 -maxdepth 1 -type f -name "*.deb")
+        debpath=$(readlink -f $(find .. -mindepth 1 -maxdepth 1 -type f -name "*.deb"))
         debname=$(basename "$debpath")
         echo "Debian package name is $debname ($debpath)"
         echo "::set-output name=debname::$debname"
-        echo "::set-output name=debpath::$debname"
+        echo "::set-output name=debpath::$debpath"
         version=$(echo "$debname" | cut -d_ -f2)
         mkdir ovh-ttyrec-$version
         install ttyrec ttyplay ttytime ovh-ttyrec-$version
         cp -va docs ovh-ttyrec-$version
-        tar cvzf ovh-ttyrec-$version-linux-static-binary.tar.gz ovh-ttyrec-$version
-        echo "Static tar.gz archive name is $debname"
-        echo "::set-output name=static_package::ovh-ttyrec-$version-linux-static-binary.tar.gz"
+        staticname=ovh-ttyrec-$version-linux-static-binary.tar.gz
+        tar cvzf $staticname ovh-ttyrec-$version
+        echo "Static tar.gz archive name is $staticname"
+        echo "::set-output name=static_package::$staticname"
 
     - name: upload debian package
       id: upload-release-asset1

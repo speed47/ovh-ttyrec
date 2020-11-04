@@ -26,6 +26,7 @@ Description: Extended (but compatible) fork of ttyrec
 %setup -q -n ovh-ttyrec
 
 %build
+STATIC=1 ./configure
 make RPM_OPT_FLAGS="$RPM_OPT_FLAGS"
 
 %install
