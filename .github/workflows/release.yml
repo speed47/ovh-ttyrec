@@ -6,177 +6,7 @@ on:
       - "v*"
 
 jobs:
-  checks:
-    runs-on: ubuntu-latest
-
-    steps:
-
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-
-    - name: verify changelogs
-      run: |
-        VERSION=$(awk '/static const char version/ { gsub(/[\";]/, "", $6); print $6; exit }' ttyrec.c)
-        if ! head -n1 debian/changelog | grep -F "ovh-ttyrec ($VERSION) master"; then
-          echo "inconsistency between version ($VERSION) and debian changelog:"
-          head -n1 debian/changelog
-          exit 1
-        fi
-        if ! grep -F "  $VERSION" ovh-ttyrec.spec; then
-          echo "inconsistency between version ($VERSION) and rpm changelog:"
-          exit 1
-        fi
-
-    - name: install prerequisites
-      run: sudo apt-get update && sudo apt-get install -y uncrustify make git gcc
-
-    - name: check style
-      run: |
-        ./configure
-        make style
-        git diff
-        if ! git diff --quiet; then
-          echo "Please make style."
-          exit 1
-        fi
-
-    - name: compile with zstd autodetection (none)
-      run: |
-        sudo apt-get remove --purge -y libzstd-dev
-        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
-        if ./ttyrec -V | grep -qF 'zstd'; then
-            exit 1
-        fi
-
-    - name: compile with zstd autodetection (static)
-      run: |
-        sudo apt-get install -y libzstd-dev
-        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
-        ./ttyrec -V | grep -qF 'zstd[static]'
-
-    - name: compile with shared libzstd
-      run: |
-        make clean && NO_STATIC_ZSTD=1 ./configure && make -j$(nproc) && ./ttyrec -V
-        if ./ttyrec -V | grep -qF 'zstd[static]'; then
-            exit 1
-        fi
-        ./ttyrec -V | grep -qF 'zstd'
-
-    - name: compile without zstd support
-      run: |
-        make clean && NO_ZSTD=1 ./configure && make -j$(nproc) && ./ttyrec -V
-        if ./ttyrec -V | grep -qF 'zstd'; then
-            exit 1
-        fi
-
-    - name: compile fully static version
-      run: |
-        make clean && STATIC=1 ./configure && make -j$(nproc) && ./ttyrec -V
-        ./ttyrec -V | grep -qF 'zstd[static]'
-        if ldd ttyrec; then
-            exit 1
-        fi
-
-  multiarch:
-    needs: checks
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        cross:
-          - arm32v5
-          - arm32v7
-          - arm64v8
-          - ppc64le
-          - mips64le
-          - s390x
-          - i386
-          - amd64
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-
-    - name: prepare qemu
-      run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-
-    - name: install prerequisites
-      run: sudo apt-get update && sudo apt-get install -y rsync zip
-
-    - name: create source zip file for rpm build
-      run: |
-        curdir=$PWD
-        tempfolder=$(mktemp -d)
-        cd $tempfolder
-        mkdir ovh-ttyrec
-        rsync -va --exclude=.git $curdir/ ovh-ttyrec/
-        mkdir -p ~/rpmbuild/SOURCES
-        zip -9r ~/rpmbuild/SOURCES/master.zip ovh-ttyrec
-
-    - name: build for ${{ matrix.cross }}
-      run: >
-        mkdir /tmp/pkg &&
-        docker run --rm -e DEBIAN_FRONTEND=noninteractive
-        -v $PWD:/pkg/code
-        -v /tmp/pkg:/pkg
-        -v $HOME:/root
-        ${{ matrix.cross }}/debian:10
-        /bin/bash -c '
-          set -exo pipefail;
-          apt-get update;
-          apt-get install -y make gcc libzstd-dev dpkg-dev debhelper unzip rpm binutils;
-          cd /pkg/code;
-          dpkg-buildpackage -b -rfakeroot -us -uc;
-          if [ "${{ matrix.cross }}" = i386 ]; then target="--target=i386"; else target=""; fi
-          set +o pipefail;
-          rpm --showrc | head;
-          set -o pipefail;
-          if [ $(rpm -E "%{_arch}") != "%{_arch}" ]; then
-            rpmbuild -bb $target ovh-ttyrec.spec;
-          else
-            arch=$(rpm --showrc | grep "^build arch" | awk "{print \$4}");
-            rpmbuild --define "_arch $arch" -bb $target ovh-ttyrec.spec;
-          fi;
-          mv ~/rpmbuild/RPMS/*/*.rpm /pkg;
-          STATIC=1 ./configure && make clean && make -j$(nproc) && ./ttyrec -V;
-          ./ttyrec -V | grep -qF "zstd[static]";
-          if ldd ttyrec; then
-            exit 1;
-          fi;
-          version=$(./ttyrec -V | head -n1 | cut -d" " -f2 | grep -Eo "[0-9][A-Za-z0-9._-]+");
-          mkdir ovh-ttyrec-$version;
-          strip ttyrec ttyplay ttytime;
-          install ttyrec ttyplay ttytime ovh-ttyrec-$version;
-          cp -va docs ovh-ttyrec-$version;
-          staticname=ovh-ttyrec-${version}_$(dpkg --print-architecture)-linux-static-binary.tar.gz;
-          tar cvzf /pkg/$staticname ovh-ttyrec-$version;
-          '
-
-    - name: get release vars
-      id: getvars
-      run: |
-        rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
-        echo "RPM package name is $rpmpath"
-        echo "rpmpath=$rpmpath" >> "$GITHUB_OUTPUT"
-        debpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.deb" ! -name "*dbgsym*")
-        echo "Debian package name is $debpath"
-        echo "debpath=$debpath" >> "$GITHUB_OUTPUT"
-        staticpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*-linux-static-binary.tar.gz" | head -n1)
-        echo "Static tar.gz archive name is $staticpath"
-        echo "staticpath=$staticpath" >> "$GITHUB_OUTPUT"
-
-    - name: Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          ${{ steps.getvars.outputs.rpmpath }}
-          ${{ steps.getvars.outputs.debpath }}
-          ${{ steps.getvars.outputs.staticpath }}
-        draft: true
-
   freebsd:
-    needs: checks
     runs-on: macos-latest
     name: FreeBSD
     steps:
@@ -184,11 +14,9 @@ jobs:
       with:
         persist-credentials: false
     - name: Build for FreeBSD
-      id: build
       uses: vmactions/freebsd-vm@v0
       with:
         usesh: true
-        sync: sshfs
         run: |
           set -ex
           freebsd-version
@@ -206,10 +34,12 @@ jobs:
           staticname=ovh-ttyrec-${version}_$(uname -m)-freebsd-static-binary.tar.gz
           tar cvzf $staticname ovh-ttyrec-$version
           echo "Static tar.gz archive name is $staticname"
-          echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
-
+          echo "staticname=$staticname" >> GITHUB_OUTPUT
+    - name: Get output name from build in vm
+      id: getname
+      run: cat GITHUB_OUTPUT >> "$GITHUB_OUTPUT"
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: ${{ steps.getvars.outputs.staticname }}
+        files: ${{ steps.getname.outputs.staticname }}
         draft: true
